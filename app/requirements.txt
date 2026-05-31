@@ -1,9 +1,7 @@
-tflite-runtime
+tensorflow-cpu==2.13.0
 streamlit
 pillow
 numpy
-pandas
-matplotlib
-opencv-python-headless
 plotly
 deep-translator
+opencv-python-headless
