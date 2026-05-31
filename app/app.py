@@ -1,10 +1,16 @@
 import streamlit as st
-import tensorflow as tf
+# import tensorflow as tf
 import numpy as np
 from PIL import Image
 import json
 import plotly.graph_objects as go
 from deep_translator import GoogleTranslator
+
+try:
+    import tflite_runtime.interpreter as tflite
+except ImportError:
+    import tensorflow as tf
+    tflite = tf.lite
 
 # ─── Page Config ────────────────────────────────────────
 st.set_page_config(
@@ -314,9 +320,14 @@ TRAINING_HISTORY = {
 # ─── Load Model ──────────────────────────────────────────
 @st.cache_resource
 def load_model():
-    interpreter = tf.lite.Interpreter(
-        model_path="../model/crop_disease_model.tflite"
-    )
+    try:
+        interpreter = tflite.Interpreter(
+            model_path="../model/crop_disease_model.tflite"
+        )
+    except:
+        interpreter = tf.lite.Interpreter(
+            model_path="../model/crop_disease_model.tflite"
+        )
     interpreter.allocate_tensors()
     return interpreter
 
