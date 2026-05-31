@@ -1,16 +1,17 @@
 import streamlit as st
-# import tensorflow as tf
 import numpy as np
 from PIL import Image
 import json
+import os
 import plotly.graph_objects as go
 from deep_translator import GoogleTranslator
 
 try:
     import tflite_runtime.interpreter as tflite
+    USE_TFLITE = True
 except ImportError:
     import tensorflow as tf
-    tflite = tf.lite
+    USE_TFLITE = False
 
 # ─── Page Config ────────────────────────────────────────
 st.set_page_config(
@@ -22,7 +23,8 @@ st.set_page_config(
 
 # ─── Load CSS ────────────────────────────────────────────
 def load_css():
-    with open("style.css", "r", encoding="utf-8") as f:
+    css_path = os.path.join(os.path.dirname(__file__), "style.css")
+    with open(css_path, "r", encoding="utf-8") as f:
         css = f.read()
     st.markdown(f"<style>{css}</style>", unsafe_allow_html=True)
 
@@ -320,43 +322,44 @@ TRAINING_HISTORY = {
 # ─── Load Model ──────────────────────────────────────────
 @st.cache_resource
 def load_model():
-    try:
-        interpreter = tflite.Interpreter(
-            model_path="../model/crop_disease_model.tflite"
-        )
-    except:
-        interpreter = tf.lite.Interpreter(
-            model_path="../model/crop_disease_model.tflite"
-        )
+    base_dir   = os.path.dirname(__file__)
+    model_path = os.path.join(base_dir, "..", "model", "crop_disease_model.tflite")
+    model_path = os.path.abspath(model_path)
+    if USE_TFLITE:
+        interpreter = tflite.Interpreter(model_path=model_path)
+    else:
+        interpreter = tf.lite.Interpreter(model_path=model_path)
     interpreter.allocate_tensors()
     return interpreter
 
 @st.cache_resource
 def load_class_names():
-    with open("../model/class_names.json", "r") as f:
+    base_dir  = os.path.dirname(__file__)
+    json_path = os.path.join(base_dir, "..", "model", "class_names.json")
+    json_path = os.path.abspath(json_path)
+    with open(json_path, "r") as f:
         return json.load(f)
 
 def predict(image, interpreter, class_names):
-    img        = image.resize((224, 224))
-    img_array  = np.array(img, dtype=np.float32) / 255.0
-    img_array  = np.expand_dims(img_array, axis=0)
-    inp        = interpreter.get_input_details()
-    out        = interpreter.get_output_details()
+    img       = image.resize((224, 224))
+    img_array = np.array(img, dtype=np.float32) / 255.0
+    img_array = np.expand_dims(img_array, axis=0)
+    inp       = interpreter.get_input_details()
+    out       = interpreter.get_output_details()
     interpreter.set_tensor(inp[0]['index'], img_array)
     interpreter.invoke()
-    preds      = interpreter.get_tensor(out[0]['index'])[0]
-    top3       = np.argsort(preds)[::-1][:3]
+    preds     = interpreter.get_tensor(out[0]['index'])[0]
+    top3      = np.argsort(preds)[::-1][:3]
     return [(class_names[i], float(preds[i]) * 100) for i in top3]
 
 def clean_name(cn):
-    return cn.replace('___',' ').replace('__',' ').replace('_',' ')
+    return cn.replace('___', ' ').replace('__', ' ').replace('_', ' ')
 
 # ════════════════════════════════════════════════════════
 # SIDEBAR
 # ════════════════════════════════════════════════════════
 with st.sidebar:
 
-    # ── Brand ─────────────────────────────────────────
     st.markdown("""
     <div class="sidebar-brand">
         <div class="sidebar-logo-row">
@@ -371,16 +374,13 @@ with st.sidebar:
     </div>
     """, unsafe_allow_html=True)
 
-    # ── Theme Toggle ───────────────────────────────────
     btn_icon  = "☀️" if st.session_state.dark_mode else "🌙"
     btn_label = "Switch to Light Mode" if st.session_state.dark_mode \
                 else "Switch to Dark Mode"
-    if st.button(f"{btn_icon}  {btn_label}",
-                 use_container_width=True):
+    if st.button(f"{btn_icon}  {btn_label}", use_container_width=True):
         st.session_state.dark_mode = not st.session_state.dark_mode
         st.rerun()
 
-    # ── Navigation ─────────────────────────────────────
     st.markdown(
         '<div class="sidebar-section-label">'
         '<i class="fa-solid fa-compass" style="margin-right:6px"></i>'
@@ -390,19 +390,12 @@ with st.sidebar:
 
     page = st.radio(
         "",
-        options=[
-            "🏠  Home",
-            "ℹ️  About",
-            "📖  How to Use",
-            "📊  Statistics"
-        ],
+        options=["🏠  Home", "ℹ️  About", "📖  How to Use", "📊  Statistics"],
         label_visibility="collapsed"
     )
 
-    st.markdown('<div class="sidebar-divider"></div>',
-                unsafe_allow_html=True)
+    st.markdown('<div class="sidebar-divider"></div>', unsafe_allow_html=True)
 
-    # ── Language ───────────────────────────────────────
     st.markdown(
         '<div class="sidebar-section-label">'
         '<i class="fa-solid fa-globe" style="margin-right:6px"></i>'
@@ -410,15 +403,12 @@ with st.sidebar:
         unsafe_allow_html=True
     )
     selected_language = st.selectbox(
-        "", list(LANGUAGES.keys()),
-        label_visibility="collapsed"
+        "", list(LANGUAGES.keys()), label_visibility="collapsed"
     )
     lang_code = LANGUAGES[selected_language]
 
-    st.markdown('<div class="sidebar-divider"></div>',
-                unsafe_allow_html=True)
+    st.markdown('<div class="sidebar-divider"></div>', unsafe_allow_html=True)
 
-    # ── Quick Stats Grid ───────────────────────────────
     st.markdown(
         '<div class="sidebar-section-label">'
         '<i class="fa-solid fa-chart-bar" style="margin-right:6px"></i>'
@@ -455,26 +445,17 @@ with st.sidebar:
 # ════════════════════════════════════════════════════════
 def plot_theme():
     if st.session_state.dark_mode:
-        return {
-            "bg":   "#161B27",
-            "paper":"#161B27",
-            "font": "#E8EDF5",
-            "grid": "#1E2A3A"
-        }
+        return {"bg": "#161B27", "paper": "#161B27",
+                "font": "#E8EDF5", "grid": "#1E2A3A"}
     else:
-        return {
-            "bg":   "#FFFFFF",
-            "paper":"#FFFFFF",
-            "font": "#1A2332",
-            "grid": "#D0DAE8"
-        }
+        return {"bg": "#FFFFFF", "paper": "#FFFFFF",
+                "font": "#1A2332", "grid": "#D0DAE8"}
 
 # ════════════════════════════════════════════════════════
 # HOME PAGE
 # ════════════════════════════════════════════════════════
 if "Home" in page:
 
-    # Hero
     st.markdown(f"""
     <div class="hero">
         <div class="hero-logo">
@@ -484,25 +465,20 @@ if "Home" in page:
             AgroVision
         </div>
         <div class="hero-subtitle">
-            {translate('AI-Powered Crop Disease Detection & Treatment System',
-                       lang_code)}
+            {translate('AI-Powered Crop Disease Detection & Treatment System', lang_code)}
         </div>
         <div class="stat-row">
             <span class="stat-pill">
-                <i class="fa-solid fa-bullseye"></i>
-                &nbsp;90.05% Accuracy
+                <i class="fa-solid fa-bullseye"></i>&nbsp;90.05% Accuracy
             </span>
             <span class="stat-pill">
-                <i class="fa-solid fa-seedling"></i>
-                &nbsp;3 Crops
+                <i class="fa-solid fa-seedling"></i>&nbsp;3 Crops
             </span>
             <span class="stat-pill">
-                <i class="fa-solid fa-virus"></i>
-                &nbsp;15 Diseases
+                <i class="fa-solid fa-virus"></i>&nbsp;15 Diseases
             </span>
             <span class="stat-pill">
-                <i class="fa-solid fa-globe"></i>
-                &nbsp;24 Languages
+                <i class="fa-solid fa-globe"></i>&nbsp;24 Languages
             </span>
         </div>
     </div>
@@ -547,8 +523,7 @@ if "Home" in page:
         """, unsafe_allow_html=True)
 
         if uploaded_file:
-            with st.spinner(
-                    translate("Analyzing leaf with AI...", lang_code)):
+            with st.spinner(translate("Analyzing leaf with AI...", lang_code)):
                 interpreter = load_model()
                 class_names = load_class_names()
                 results     = predict(image, interpreter, class_names)
@@ -583,8 +558,7 @@ if "Home" in page:
                 </div>
                 """, unsafe_allow_html=True)
 
-            st.markdown(
-                f"**{translate('Top 3 Predictions', lang_code)}:**")
+            st.markdown(f"**{translate('Top 3 Predictions', lang_code)}:**")
             for name, conf in results:
                 label = translate(clean_name(name), lang_code)
                 st.progress(int(conf))
@@ -597,13 +571,11 @@ if "Home" in page:
                           opacity:0.4;margin-bottom:1rem;
                           display:block"></i>
                 <p style="color:var(--text-muted)">
-                    {translate('Upload a leaf image to get started',
-                               lang_code)}
+                    {translate('Upload a leaf image to get started', lang_code)}
                 </p>
             </div>
             """, unsafe_allow_html=True)
 
-    # Disease Info
     if uploaded_file and results:
         st.markdown("---")
         st.markdown(f"""
@@ -611,8 +583,7 @@ if "Home" in page:
             <h4>
                 <i class="fa-solid fa-notes-medical"
                    style="color:var(--primary)"></i>
-                &nbsp;{translate('Disease Information & Treatment Guide',
-                                 lang_code)}
+                &nbsp;{translate('Disease Information & Treatment Guide', lang_code)}
             </h4>
         </div>
         """, unsafe_allow_html=True)
@@ -672,10 +643,8 @@ if "Home" in page:
     <div class="footer">
         <i class="fa-solid fa-leaf" style="color:var(--primary)"></i>
         &nbsp;<span>AgroVision</span> —
-        {translate('AI-Powered Crop Disease Detection & Treatment System',
-                   lang_code)} &nbsp;|&nbsp;
-        <span>Asansol Engineering College</span> &nbsp;|&nbsp;
-        MCA 2025-2026
+        {translate('AI-Powered Crop Disease Detection & Treatment System', lang_code)}
+        &nbsp;|&nbsp;<span>Asansol Engineering College</span>&nbsp;|&nbsp;MCA 2025-2026
     </div>
     """, unsafe_allow_html=True)
 
@@ -693,8 +662,7 @@ elif "About" in page:
             {translate('About AgroVision', lang_code)}
         </div>
         <div class="hero-subtitle">
-            {translate('AI-Powered Crop Disease Detection & Treatment System',
-                       lang_code)}
+            {translate('AI-Powered Crop Disease Detection & Treatment System', lang_code)}
         </div>
     </div>
     """, unsafe_allow_html=True)
@@ -732,7 +700,7 @@ elif "About" in page:
             <i class="fa-solid fa-brain" style="color:var(--primary)"></i>
             &nbsp;<b>AI Model:</b> MobileNetV2 (Transfer Learning)<br>
             <i class="fa-solid fa-bolt" style="color:var(--gold)"></i>
-            &nbsp;<b>Framework:</b> TensorFlow 2.21 / TFLite<br>
+            &nbsp;<b>Framework:</b> TensorFlow 2.13 / TFLite<br>
             <i class="fa-solid fa-palette" style="color:var(--info)"></i>
             &nbsp;<b>Frontend:</b> Streamlit<br>
             <i class="fa-solid fa-globe" style="color:var(--success)"></i>
@@ -772,21 +740,20 @@ elif "About" in page:
             &nbsp;{translate('Meet The Team', lang_code)}
         </h4>
         <p style="color:var(--text-muted)">
-            {translate('Asansol Engineering College | Department of MCA | 2025-2026',
-                       lang_code)}
+            {translate('Asansol Engineering College | Department of MCA | 2025-2026', lang_code)}
         </p>
     </div>
     """, unsafe_allow_html=True)
 
     team = [
         {"name": "Akanksha Singh",  "roll": "108710240003",
-         "role": "Problem Definition & Dataset",   "icon": "👩‍💻"},
+         "role": "Problem Definition & Dataset",  "icon": "👩‍💻"},
         {"name": "Ankita Kumari",   "roll": "108710240006",
-         "role": "Model Architecture & Training",  "icon": "👩‍🔬"},
+         "role": "Model Architecture & Training", "icon": "👩‍🔬"},
         {"name": "Bipasa Nath",     "roll": "108710240010",
-         "role": "TFLite Conversion & Backend",    "icon": "👩‍💼"},
+         "role": "TFLite Conversion & Backend",   "icon": "👩‍💼"},
         {"name": "Shifa Iqbal",     "roll": "108710240033",
-         "role": "UI Development & Deployment",    "icon": "👩‍🎨"},
+         "role": "UI Development & Deployment",   "icon": "👩‍🎨"},
     ]
 
     cols = st.columns(4, gap="medium")
@@ -804,9 +771,8 @@ elif "About" in page:
     st.markdown(f"""
     <div class="footer">
         <i class="fa-solid fa-leaf" style="color:var(--primary)"></i>
-        &nbsp;<span>AgroVision</span> &nbsp;|&nbsp;
-        <span>Asansol Engineering College</span> &nbsp;|&nbsp;
-        MCA 2025-2026
+        &nbsp;<span>AgroVision</span>&nbsp;|&nbsp;
+        <span>Asansol Engineering College</span>&nbsp;|&nbsp;MCA 2025-2026
     </div>
     """, unsafe_allow_html=True)
 
@@ -824,8 +790,7 @@ elif "How to Use" in page:
             {translate('How to Use', lang_code)}
         </div>
         <div class="hero-subtitle">
-            {translate('Follow these simple steps to detect crop diseases instantly',
-                       lang_code)}
+            {translate('Follow these simple steps to detect crop diseases instantly', lang_code)}
         </div>
     </div>
     """, unsafe_allow_html=True)
@@ -921,9 +886,8 @@ elif "How to Use" in page:
     </div>
     <div class="footer">
         <i class="fa-solid fa-leaf" style="color:var(--primary)"></i>
-        &nbsp;<span>AgroVision</span> &nbsp;|&nbsp;
-        <span>Asansol Engineering College</span> &nbsp;|&nbsp;
-        MCA 2025-2026
+        &nbsp;<span>AgroVision</span>&nbsp;|&nbsp;
+        <span>Asansol Engineering College</span>&nbsp;|&nbsp;MCA 2025-2026
     </div>
     """, unsafe_allow_html=True)
 
@@ -941,21 +905,20 @@ elif "Statistics" in page:
             {translate('Statistics', lang_code)}
         </div>
         <div class="hero-subtitle">
-            {translate('Dataset details, model performance and training results',
-                       lang_code)}
+            {translate('Dataset details, model performance and training results', lang_code)}
         </div>
     </div>
     """, unsafe_allow_html=True)
 
     m1, m2, m3, m4 = st.columns(4)
     with m1:
-        st.metric("🎯 Best Accuracy",  "90.05%", "+4.78%")
+        st.metric("🎯 Best Accuracy", "90.05%", "+4.78%")
     with m2:
-        st.metric("📸 Total Images",   "20,639")
+        st.metric("📸 Total Images", "20,639")
     with m3:
-        st.metric("🏋️ Training",       "16,516", "80%")
+        st.metric("🏋️ Training", "16,516", "80%")
     with m4:
-        st.metric("✅ Validation",     "4,122",  "20%")
+        st.metric("✅ Validation", "4,122", "20%")
 
     st.markdown("---")
 
@@ -980,8 +943,7 @@ elif "Statistics" in page:
             mode='lines+markers',
             name=translate('Training Accuracy', lang_code),
             line=dict(color='#00D4AA', width=3),
-            marker=dict(size=8, symbol='circle',
-                        color='#00D4AA',
+            marker=dict(size=8, symbol='circle', color='#00D4AA',
                         line=dict(width=2, color='#007A60'))
         ))
         fig_acc.add_trace(go.Scatter(
@@ -990,21 +952,17 @@ elif "Statistics" in page:
             mode='lines+markers',
             name=translate('Validation Accuracy', lang_code),
             line=dict(color='#F4C430', width=3),
-            marker=dict(size=8, symbol='diamond',
-                        color='#F4C430',
+            marker=dict(size=8, symbol='diamond', color='#F4C430',
                         line=dict(width=2, color='#9A7A00'))
         ))
         fig_acc.update_layout(
             plot_bgcolor=pt["bg"], paper_bgcolor=pt["paper"],
             font=dict(color=pt["font"], family='Inter'),
             xaxis=dict(title=translate('Epoch', lang_code),
-                       gridcolor=pt["grid"], tickmode='linear',
-                       showgrid=True),
+                       gridcolor=pt["grid"], tickmode='linear', showgrid=True),
             yaxis=dict(title=translate('Accuracy (%)', lang_code),
-                       gridcolor=pt["grid"], range=[70, 95],
-                       showgrid=True),
-            legend=dict(bgcolor='rgba(0,0,0,0)',
-                        bordercolor=pt["grid"]),
+                       gridcolor=pt["grid"], range=[70, 95], showgrid=True),
+            legend=dict(bgcolor='rgba(0,0,0,0)', bordercolor=pt["grid"]),
             margin=dict(l=10, r=10, t=10, b=10),
             hovermode='x unified'
         )
@@ -1026,8 +984,7 @@ elif "Statistics" in page:
             mode='lines+markers',
             name=translate('Training Loss', lang_code),
             line=dict(color='#FF4757', width=3),
-            marker=dict(size=8, symbol='circle',
-                        color='#FF4757',
+            marker=dict(size=8, symbol='circle', color='#FF4757',
                         line=dict(width=2, color='#A00010'))
         ))
         fig_loss.add_trace(go.Scatter(
@@ -1035,20 +992,17 @@ elif "Statistics" in page:
             mode='lines+markers',
             name=translate('Validation Loss', lang_code),
             line=dict(color='#4FACFE', width=3),
-            marker=dict(size=8, symbol='diamond',
-                        color='#4FACFE',
+            marker=dict(size=8, symbol='diamond', color='#4FACFE',
                         line=dict(width=2, color='#005A9E'))
         ))
         fig_loss.update_layout(
             plot_bgcolor=pt["bg"], paper_bgcolor=pt["paper"],
             font=dict(color=pt["font"], family='Inter'),
             xaxis=dict(title=translate('Epoch', lang_code),
-                       gridcolor=pt["grid"], tickmode='linear',
-                       showgrid=True),
+                       gridcolor=pt["grid"], tickmode='linear', showgrid=True),
             yaxis=dict(title=translate('Loss', lang_code),
                        gridcolor=pt["grid"], showgrid=True),
-            legend=dict(bgcolor='rgba(0,0,0,0)',
-                        bordercolor=pt["grid"]),
+            legend=dict(bgcolor='rgba(0,0,0,0)', bordercolor=pt["grid"]),
             margin=dict(l=10, r=10, t=10, b=10),
             hovermode='x unified'
         )
@@ -1060,8 +1014,7 @@ elif "Statistics" in page:
         <h4>
             <i class="fa-solid fa-chart-bar"
                style="color:var(--info)"></i>
-            &nbsp;{translate('Dataset Distribution by Disease Class',
-                             lang_code)}
+            &nbsp;{translate('Dataset Distribution by Disease Class', lang_code)}
         </h4>
     </div>
     """, unsafe_allow_html=True)
@@ -1095,8 +1048,7 @@ elif "Statistics" in page:
         x=list(disease_counts.values()),
         y=list(disease_counts.keys()),
         orientation='h',
-        marker=dict(color=bar_colors, opacity=0.9,
-                    line=dict(width=0)),
+        marker=dict(color=bar_colors, opacity=0.9, line=dict(width=0)),
         text=list(disease_counts.values()),
         textposition='outside',
         textfont=dict(color=pt["font"], size=11)
@@ -1115,8 +1067,7 @@ elif "Statistics" in page:
     st.markdown(f"""
     <div class="footer">
         <i class="fa-solid fa-leaf" style="color:var(--primary)"></i>
-        &nbsp;<span>AgroVision</span> &nbsp;|&nbsp;
-        <span>Asansol Engineering College</span> &nbsp;|&nbsp;
-        MCA 2025-2026
+        &nbsp;<span>AgroVision</span>&nbsp;|&nbsp;
+        <span>Asansol Engineering College</span>&nbsp;|&nbsp;MCA 2025-2026
     </div>
     """, unsafe_allow_html=True)
