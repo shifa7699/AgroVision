@@ -1,0 +1,9 @@
+tensorflow==2.21.0
+streamlit
+pillow
+numpy
+pandas
+matplotlib
+opencv-python-headless
+plotly
+deep-translator
