@@ -13,7 +13,7 @@ except ImportError:
     import tensorflow as tf
     USE_TFLITE = False
 
-# ─── Page Config ────────────────────────────────────────
+#------------------Page Configuration-------------------
 st.set_page_config(
     page_title="AgroVision",
     page_icon="🌿",
@@ -30,7 +30,7 @@ def load_css():
 
 load_css()
 
-# ─── Font Awesome ─────────────────────────────────────────
+#-----------------------Font Awesome--------------------------------
 st.markdown("""
 <link rel="stylesheet"
       href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
@@ -47,7 +47,7 @@ st.markdown(f"""
 </script>
 """, unsafe_allow_html=True)
 
-# ─── Language Setup ──────────────────────────────────────
+#--------------------Language Setup---------------------
 LANGUAGES = {
     "English": "en",
     "Hindi (हिंदी)": "hi",
@@ -75,7 +75,7 @@ LANGUAGES = {
     "Santali (ᱥᱟᱱᱛᱟᱲᱤ)": "sat"
 }
 
-# ─── Translation Cache ───────────────────────────────────
+#-------------------Translation Cache------------------
 if "translation_cache" not in st.session_state:
     st.session_state.translation_cache = {}
 
@@ -98,7 +98,7 @@ def translate_list(items, target_lang):
         return items
     return [translate(item, target_lang) for item in items]
 
-# ─── Disease Database ────────────────────────────────────
+#------------------Disease Database--------------------
 DISEASE_INFO = {
     "Pepper__bell___Bacterial_spot": {
         "description": "A bacterial disease caused by Xanthomonas campestris that affects pepper plants.",
@@ -307,7 +307,7 @@ DISEASE_INFO = {
     }
 }
 
-# ─── Training History ────────────────────────────────────
+#----------------Training History----------------------------
 TRAINING_HISTORY = {
     "accuracy":     [0.7370, 0.8356, 0.8518, 0.8607,
                      0.8770, 0.8810, 0.8853, 0.8890],
@@ -319,12 +319,15 @@ TRAINING_HISTORY = {
                      0.2976, 0.3054, 0.2906, 0.2888]
 }
 
-# ─── Load Model ──────────────────────────────────────────
+# -------------Load Model-------------------------------
 @st.cache_resource
 def load_model():
-    base_dir   = os.path.dirname(__file__)
+    base_dir   = os.path.dirname(os.path.abspath(__file__))
     model_path = os.path.join(base_dir, "..", "model", "crop_disease_model.tflite")
-    model_path = os.path.abspath(model_path)
+    model_path = os.path.normpath(model_path)
+    if not os.path.exists(model_path):
+        st.error(f"Model file not found at: {model_path}")
+        st.stop()
     if USE_TFLITE:
         interpreter = tflite.Interpreter(model_path=model_path)
     else:
@@ -334,12 +337,14 @@ def load_model():
 
 @st.cache_resource
 def load_class_names():
-    base_dir  = os.path.dirname(__file__)
+    base_dir  = os.path.dirname(os.path.abspath(__file__))
     json_path = os.path.join(base_dir, "..", "model", "class_names.json")
-    json_path = os.path.abspath(json_path)
+    json_path = os.path.normpath(json_path)
+    if not os.path.exists(json_path):
+        st.error(f"Class names file not found at: {json_path}")
+        st.stop()
     with open(json_path, "r") as f:
         return json.load(f)
-
 def predict(image, interpreter, class_names):
     img       = image.resize((224, 224))
     img_array = np.array(img, dtype=np.float32) / 255.0
@@ -355,9 +360,7 @@ def predict(image, interpreter, class_names):
 def clean_name(cn):
     return cn.replace('___', ' ').replace('__', ' ').replace('_', ' ')
 
-# ════════════════════════════════════════════════════════
-# SIDEBAR
-# ════════════════════════════════════════════════════════
+# ---------------Sidebar-------------------------
 with st.sidebar:
 
     st.markdown("""
@@ -440,9 +443,9 @@ with st.sidebar:
     </div>
     """, unsafe_allow_html=True)
 
-# ════════════════════════════════════════════════════════
-# PLOT THEME HELPER
-# ════════════════════════════════════════════════════════
+
+#--------------------PLOT THEME HELPER------------
+
 def plot_theme():
     if st.session_state.dark_mode:
         return {"bg": "#161B27", "paper": "#161B27",
@@ -451,9 +454,9 @@ def plot_theme():
         return {"bg": "#FFFFFF", "paper": "#FFFFFF",
                 "font": "#1A2332", "grid": "#D0DAE8"}
 
-# ════════════════════════════════════════════════════════
-# HOME PAGE
-# ════════════════════════════════════════════════════════
+
+# ---------HOME PAGE-------------------------
+
 if "Home" in page:
 
     st.markdown(f"""
@@ -648,9 +651,9 @@ if "Home" in page:
     </div>
     """, unsafe_allow_html=True)
 
-# ════════════════════════════════════════════════════════
-# ABOUT PAGE
-# ════════════════════════════════════════════════════════
+
+#-----------------ABOUT PAGE------------------------
+
 elif "About" in page:
 
     st.markdown(f"""
@@ -776,9 +779,8 @@ elif "About" in page:
     </div>
     """, unsafe_allow_html=True)
 
-# ════════════════════════════════════════════════════════
-# HOW TO USE PAGE
-# ════════════════════════════════════════════════════════
+# -------HOW TO USE PAGE------------------
+
 elif "How to Use" in page:
 
     st.markdown(f"""
@@ -891,9 +893,7 @@ elif "How to Use" in page:
     </div>
     """, unsafe_allow_html=True)
 
-# ════════════════════════════════════════════════════════
-# STATISTICS PAGE
-# ════════════════════════════════════════════════════════
+#-------------Statistics Page--------------------------
 elif "Statistics" in page:
 
     st.markdown(f"""
